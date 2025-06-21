@@ -63,45 +63,32 @@ with tab1:
         st.dataframe(df_cadena.style.format({"IV": "{:.2%}", "Delta": "{:.4f}", "Moneyness": "{:.2%}"}), use_container_width=True)
 
         # Clean data for cadena_df before plotting
-        if 'IV' in df_cadena.columns:
-            df_cadena['IV'] = df_cadena['IV'].replace(['unch', 'N/A', ''], np.nan)
-            # Apply rstrip and division only to strings, then convert all to numeric
-            # Ensure that we handle potential pd.NA by converting to string first ONLY for rstrip
-            def clean_iv(val):
-                if pd.isna(val):
-                    return np.nan
-                s_val = str(val)
-                if s_val.endswith('%'):
-                    return pd.to_numeric(s_val.rstrip('%'), errors='coerce') / 100.0
-                return pd.to_numeric(s_val, errors='coerce') / 100.0 # Assuming it's already a pre-scaled percentage if no '%'
-            df_cadena['IV'] = df_cadena['IV'].apply(clean_iv)
-            df_cadena['IV'] = pd.to_numeric(df_cadena['IV'], errors='coerce')
+        cols_to_clean_cadena = {
+            'IV': True, 'Moneyness': True, 'Delta': False, 'Strike': False,
+            'Bid': False, 'Mid': False, 'Ask': False, 'Last': False,
+            'Volume': False, 'Open Int': False
+        }
 
-
-        if 'Moneyness' in df_cadena.columns:
-            df_cadena['Moneyness'] = df_cadena['Moneyness'].replace(['unch', 'N/A', ''], np.nan)
-            def clean_moneyness(val):
-                if pd.isna(val):
-                    return np.nan
-                s_val = str(val).replace('+', '')
-                if s_val.endswith('%'):
-                    return pd.to_numeric(s_val.rstrip('%'), errors='coerce') / 100.0
-                # If not ending with %, try converting directly, assuming it might be a pre-scaled decimal
-                # This case might need adjustment based on actual data variety
-                return pd.to_numeric(s_val, errors='coerce')
-            df_cadena['Moneyness'] = df_cadena['Moneyness'].apply(clean_moneyness)
-            df_cadena['Moneyness'] = pd.to_numeric(df_cadena['Moneyness'], errors='coerce')
-
-        plain_numeric_cols_cadena = ['Delta', 'Strike', 'Bid', 'Mid', 'Ask', 'Last', 'Volume', 'Open Int']
-        for col in plain_numeric_cols_cadena:
+        for col, is_percent in cols_to_clean_cadena.items():
             if col in df_cadena.columns:
-                df_cadena[col] = df_cadena[col].replace(['unch', 'N/A', ''], np.nan)
-                df_cadena[col] = pd.to_numeric(df_cadena[col], errors='coerce')
+                # First, replace known non-numeric strings like 'unch' with NaN
+                # Also handle potential '+' sign in Moneyness before stripping '%'
+                if col == 'Moneyness':
+                    df_cadena[col] = df_cadena[col].astype(str).str.replace('+', '', regex=False)
+
+                df_cadena[col] = df_cadena[col].replace(['unch', 'N/A', ''], pd.NA)
+
+                if is_percent:
+                    # Ensure it's string before rstrip, then convert to numeric, then scale
+                    df_cadena[col] = pd.to_numeric(df_cadena[col].astype(str).str.rstrip('%'), errors='coerce') / 100.0
+                else:
+                    df_cadena[col] = pd.to_numeric(df_cadena[col], errors='coerce')
+            else:
+                st.warning(f"Columna '{col}' no encontrada en CADENA.csv para la limpieza.")
 
         # Define numeric columns explicitly for dropping NA after all conversions
-        # These are the columns used in subsequent .style.format or plots that need to be numeric
-        cols_for_style_and_plot_cadena = ['IV', 'Delta', 'Moneyness', 'Strike', 'Volume', 'Open Int']
-        df_cadena.dropna(subset=[col for col in cols_for_style_and_plot_cadena if col in df_cadena.columns], inplace=True)
+        numeric_cols_for_na_drop_cadena = ['Strike', 'Bid', 'Mid', 'Ask', 'Last', 'Volume', 'Open Int', 'IV', 'Delta', 'Moneyness']
+        df_cadena.dropna(subset=[col for col in numeric_cols_for_na_drop_cadena if col in df_cadena.columns], inplace=True)
 
         st.subheader("Análisis Visual de la Cadena")
 
